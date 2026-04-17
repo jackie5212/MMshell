@@ -1,0 +1,6 @@
+M1 原生拖拽占位文件
+M1 native drag placeholder file
+
+remote_path=/AAATEST/log、.txt
+is_dir=false
+created_at_ms=1776247201663

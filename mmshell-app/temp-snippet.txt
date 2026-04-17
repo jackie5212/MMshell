@@ -1,0 +1,73 @@
+                        &lt;/button&gt;
+                      &lt;/div&gt;
+                      &lt;div className="sftp-sync-option"&gt;
+                        &lt;label&gt;
+                          &lt;input
+                            type="checkbox"
+                            checked={syncDirEnabled}
+                            onChange={(e) =&gt; setSyncDirEnabled(e.target.checked)}
+                            disabled={!sftpSessionId}
+                          /&gt;
+                          同步目录到控制台
+                        &lt;/label&gt;
+                      &lt;/div&gt;
+                      &lt;ul className="sftp-list" onDragOver={handleDragOver} onDrop={handleDrop}&gt;
+                        {sftpEntries.length === 0 ? &lt;li className="hint"&gt;连接成功后会自动加载目录&lt;/li&gt; : null}
+                        {sftpSessionId &amp;&amp; (
+                          &lt;li className="sftp-row"&gt;
+                            &lt;div className="sftp-item-main"&gt;
+                              &lt;button className="sftp-item dir" onClick={() =&gt; void changeSftpDir("..")}&gt;
+                                &lt;Folder size={15} color="#1d4f91" /&gt;
+                                &lt;span className="sftp-name"&gt;..&lt;/span&gt;
+                              &lt;/button&gt;
+                            &lt;/div&gt;
+                          &lt;/li&gt;
+                        )}
+                        {sftpEntries.map((entry) =&gt; (
+                          &lt;li key={entry.name} className="sftp-row"&gt;
+                            &lt;div className="sftp-item-main"&gt;
+                              {entry.isDir ? (
+                                &lt;button className="sftp-item dir" onClick={() =&gt; void changeSftpDir(entry.name)}&gt;
+                                  &lt;Folder size={15} color={getSftpIconColorByName(entry.name, true)} /&gt;
+                                  &lt;span className="sftp-name"&gt;{entry.name}&lt;/span&gt;
+                                &lt;/button&gt;
+                              ) : (
+                                (() =&gt; {
+                                  const Icon = getSftpIconByName(entry.name);
+                                  return (
+                                    &lt;span
+                                      className="sftp-item file"
+                                      draggable
+                                      onDragStart={(e) =&gt; handleFileDragStart(e, entry)}
+                                    &gt;
+                                      &lt;Icon size={15} color={getSftpIconColorByName(entry.name, false)} /&gt;
+                                      &lt;span className="sftp-name"&gt;{entry.name}&lt;/span&gt;
+                                    &lt;/span&gt;
+                                  );
+                                })()
+                              )}
+                            &lt;/div&gt;
+                            &lt;button
+                              type="button"
+                              className="sftp-del"
+                              title="删除"
+                              aria-label={`删除 ${entry.name}`}
+                              onClick={() =&gt; void deleteSftpEntry(entry)}
+                            &gt;
+                              &lt;Trash2 size={14} /&gt;
+                            &lt;/button&gt;
+                          &lt;/li&gt;
+                        ))}
+                      &lt;/ul&gt;
+                      {sftpProgress &amp;&amp; (
+                        &lt;div className="sftp-progress"&gt;
+                          &lt;div className="sftp-progress-info"&gt;
+                            &lt;span className="sftp-progress-file"&gt;{sftpProgress.file}&lt;/span&gt;
+                            &lt;span className="sftp-progress-speed"&gt;{sftpProgress.speed}&lt;/span&gt;
+                          &lt;/div&gt;
+                          &lt;div className="sftp-progress-bar"&gt;
+                            &lt;div className="sftp-progress-fill" style={{ width: `${sftpProgress.percent}%` }} /&gt;
+                          &lt;/div&gt;
+                          &lt;span className="sftp-progress-percent"&gt;{sftpProgress.percent}%&lt;/span&gt;
+                        &lt;/div&gt;
+                      )}

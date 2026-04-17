@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "sessions": [
+    {
+      "name": "luckfox",
+      "host": "192.168.0.106",
+      "port": 22,
+      "user": "root",
+      "password": "sciherd20230801",
+      "group": "常用",
+      "id": "1776218282394"
+    },
+    {
+      "name": "luckfox (副本)",
+      "host": "192.168.0.106",
+      "port": 22,
+      "user": "root",
+      "password": "sciherd20230801",
+      "group": "常用",
+      "id": "session-1776316466166-tyiqiukmy"
+    },
+    {
+      "name": "luckfox (副本) (副本)",
+      "host": "192.168.0.106",
+      "port": 22,
+      "user": "root",
+      "password": "sciherd20230801",
+      "group": "常用",
+      "id": "session-1776316545628-1vqtdo82p"
+    }
+  ],
+  "settings": {
+    "language": "en-US",
+    "themePresetId": "shell-dark",
+    "terminalTheme": {
+      "background": "#0b1220",
+      "foreground": "#d6deeb",
+      "cursor": "#f8fafc",
+      "cursorAccent": "#0b1220",
+      "selectionBackground": "#2a3c57",
+      "black": "#1b2432",
+      "red": "#ff6b6b",
+      "green": "#526048",
+      "yellow": "#f6c177",
+      "blue": "#82aaff",
+      "magenta": "#c792ea",
+      "cyan": "#89ddff",
+      "white": "#d6deeb",
+      "brightBlack": "#5c6773",
+      "brightRed": "#ff8b8b",
+      "brightGreen": "#a0e8af",
+      "brightYellow": "#ffd89a",
+      "brightBlue": "#9cc4ff",
+      "brightMagenta": "#ddb3ff",
+      "brightCyan": "#b2ebff",
+      "brightWhite": "#ffffff"
+    }
+  },
+  "lastUpdated": "2026-04-16T05:15:45.628Z"
+}

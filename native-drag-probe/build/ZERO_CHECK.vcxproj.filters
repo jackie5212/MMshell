@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\MMShell0414\native-drag-probe\build\CMakeFiles\eca9f44d794b28ff6f40b6d3859203c8\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{57287308-6D30-3D4F-A963-EF4FF8B4A410}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

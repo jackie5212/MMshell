@@ -1,0 +1,10 @@
+^D:\MMSHELL0414\NATIVE-DRAG-PROBE\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/MMShell0414/native-drag-probe -BD:/MMShell0414/native-drag-probe/build --check-stamp-file D:/MMShell0414/native-drag-probe/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
