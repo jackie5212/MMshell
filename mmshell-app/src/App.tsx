@@ -68,6 +68,7 @@ type Session = {
   user: string;
   group: string;
   password?: string;
+  privateKeyPath?: string; // 私钥文件路径（可选）
 };
 
 type TerminalTheme = {
@@ -807,6 +808,7 @@ function extractPwdFromPrompt(output: string): string | null {
 function App() {
   const [address, setAddress] = useState("root@192.168.0.106:22");
   const [password, setPassword] = useState("");
+  const [privateKeyPath, setPrivateKeyPath] = useState(""); // 私钥文件路径
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sftpSessionId, setSftpSessionId] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -860,6 +862,7 @@ function App() {
     port: 22,
     user: "root",
     password: "",
+    privateKeyPath: "", // 私钥文件路径
     group: I18N["zh-CN"].groupCommon
   });
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -867,6 +870,7 @@ function App() {
   const sftpReadyRef = useRef(false);
   const sftpAutoListedRef = useRef(false);
   const sftpProgressHideTimerRef = useRef<number | null>(null);
+  const privateKeyPathRef = useRef(""); // 私钥文件路径ref
 
   const termHostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -1043,6 +1047,10 @@ function App() {
   useEffect(() => {
     passwordRef.current = password;
   }, [password]);
+
+  useEffect(() => {
+    privateKeyPathRef.current = privateKeyPath;
+  }, [privateKeyPath]);
 
   useEffect(() => {
     syncDirEnabledRef.current = syncDirEnabled;
@@ -1370,10 +1378,13 @@ function App() {
       waitingForShellPromptRef.current = true;
       setError("");
       const effectivePassword = passwordRef.current || password;
+      const effectivePrivateKeyPath = privateKeyPathRef.current || privateKeyPath;
       console.log("[CONNECT] handleConnect start", {
         address,
         hasPassword: Boolean(effectivePassword),
         passwordLength: effectivePassword.length,
+        hasPrivateKey: Boolean(effectivePrivateKeyPath),
+        privateKeyPath: effectivePrivateKeyPath,
         isTauri: isTauri(),
       });
       terminalRef.current?.writeln(`\r\n[debug] connecting: ${address}\r\n`);
@@ -1389,13 +1400,13 @@ function App() {
       setSftpEntries([]);
       setStatus(t.statusConnecting);
 
-      const sid = await invoke<string>("connect_ssh", { payload: { address, password: effectivePassword } });
+      const sid = await invoke<string>("connect_ssh", { payload: { address, password: effectivePassword, privateKeyPath: effectivePrivateKeyPath } });
       console.log("[CONNECT] ssh session created", sid);
       terminalRef.current?.writeln(`[debug] ssh sid=${sid}\r\n`);
       setSessionId(sid);
       sessionIdRef.current = sid;
 
-      const sftpSid = await invoke<string>("connect_sftp", { payload: { address, password: effectivePassword } });
+      const sftpSid = await invoke<string>("connect_sftp", { payload: { address, password: effectivePassword, privateKeyPath: effectivePrivateKeyPath } });
       console.log("[CONNECT] sftp session created", sftpSid);
       terminalRef.current?.writeln(`[debug] sftp sid=${sftpSid}\r\n`);
       setSftpSessionId(sftpSid);
@@ -1458,9 +1469,11 @@ function App() {
       setIsConnecting(false);
       sshOutputTailRef.current = "";
       lastSyncedPromptPathRef.current = "/";
-      // 清空地址栏和密码
+      // 清空地址栏、密码和私钥路径
       setAddress("");
       setPassword("");
+      setPrivateKeyPath("");
+      privateKeyPathRef.current = "";
       // 清空终端并显示欢迎信息
       if (terminalRef.current) {
         terminalRef.current.clear();
@@ -1634,6 +1647,7 @@ function App() {
         port: sessionMenu.session.port,
         user: sessionMenu.session.user,
         password: sessionMenu.session.password || "",
+        privateKeyPath: sessionMenu.session.privateKeyPath || "",
         group: sessionMenu.session.group
       });
       setShowNewSessionModal(true);
@@ -1677,6 +1691,9 @@ function App() {
       const selectedPassword = sessionMenu.session.password || "";
       passwordRef.current = selectedPassword;
       setPassword(selectedPassword);
+      const selectedPrivateKeyPath = sessionMenu.session.privateKeyPath || "";
+      privateKeyPathRef.current = selectedPrivateKeyPath;
+      setPrivateKeyPath(selectedPrivateKeyPath);
       // 关闭菜单
       setSessionMenu(prev => ({ ...prev, visible: false }));
       // 执行连接
@@ -2043,6 +2060,7 @@ function App() {
         port: 22,
         user: "root",
         password: "",
+        privateKeyPath: "",
         group: t.groupCommon,
       });
       setStatus(t.statusSessionSaved);
@@ -2152,6 +2170,29 @@ function App() {
       ...prev,
       [name]: name === "port" ? parseInt(value) || 22 : value
     }));
+  }
+
+  /** 处理私钥文件选择。 / Handle private key file selection. */
+  async function handlePrivateKeyFileSelect() {
+    if (!isTauri()) return;
+    try {
+      // 使用tauri-plugin-dialog来选择文件
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'All Files',
+          extensions: ['*']
+        }]
+      });
+      if (selected) {
+        const path = Array.isArray(selected) ? selected[0] : selected;
+        setNewSession(prev => ({ ...prev, privateKeyPath: path || "" }));
+      }
+    } catch (err) {
+      console.error("选择私钥文件失败:", err);
+      setError("选择私钥文件失败");
+    }
   }
 
   /** 切换终端主题预设并立即持久化。 / Switch terminal theme preset and persist immediately. */
@@ -2281,6 +2322,14 @@ function App() {
                 className="address"
                 disabled={Boolean(sessionId)}
               />
+              <input
+                value={privateKeyPath}
+                onChange={(e) => setPrivateKeyPath(e.currentTarget.value)}
+                placeholder="私钥文件路径（可选）"
+                className="address"
+                style={{ maxWidth: '200px', marginLeft: '8px' }}
+                disabled={Boolean(sessionId)}
+              />
             </div>
           </div>
         </div>
@@ -2329,6 +2378,9 @@ function App() {
                               const selectedPassword = session.password || "";
                               passwordRef.current = selectedPassword;
                               setPassword(selectedPassword);
+                              const selectedPrivateKeyPath = session.privateKeyPath || "";
+                              privateKeyPathRef.current = selectedPrivateKeyPath;
+                              setPrivateKeyPath(selectedPrivateKeyPath);
                             }}
                             onContextMenu={(e) => handleSessionContextMenu(e, session)}
                           >
@@ -2691,6 +2743,29 @@ function App() {
                   onChange={handleSessionChange}
                   placeholder={t.inputPassword}
                 />
+              </div>
+              <div className="form-group">
+                <label>私钥文件（可选）</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    name="privateKeyPath"
+                    value={newSession.privateKeyPath}
+                    onChange={handleSessionChange}
+                    placeholder="选择私钥文件路径"
+                    style={{ flex: 1 }}
+                    readOnly
+                  />
+                  <button
+                    type="button"
+                    className="modal-button"
+                    onClick={handlePrivateKeyFileSelect}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    浏览...
+                  </button>
+                </div>
+                <p className="hint">支持所有格式的私钥文件</p>
               </div>
               <div className="form-group">
                 <label>{t.group}</label>

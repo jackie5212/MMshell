@@ -13,6 +13,94 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager};
 use std::mem::ManuallyDrop;
+
+/// 修复SSH私钥文件权限（Windows）
+#[cfg(target_os = "windows")]
+fn fix_ssh_key_permissions(key_path: &str) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    
+    eprintln!("[mmshell] 开始修复私钥权限: {}", key_path);
+    
+    // 第一步：获取文件所有权
+    let output = Command::new("takeown")
+        .arg("/f")
+        .arg(key_path)
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output()
+        .map_err(|e| format!("takeown失败: {}", e))?;
+    
+    if !output.status.success() {
+        eprintln!("[mmshell] takeown警告: {}", String::from_utf8_lossy(&output.stderr));
+    }
+    
+    // 第二步：重置所有权限
+    let output = Command::new("icacls")
+        .arg(key_path)
+        .arg("/reset")
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|e| format!("icacls reset失败: {}", e))?;
+    
+    if !output.status.success() {
+        eprintln!("[mmshell] icacls reset警告: {}", String::from_utf8_lossy(&output.stderr));
+    }
+    
+    // 第三步：移除继承权限
+    let output = Command::new("icacls")
+        .arg(key_path)
+        .arg("/inheritance:r")
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|e| format!("移除继承权限失败: {}", e))?;
+    
+    if !output.status.success() {
+        return Err(format!("icacls /inheritance:r失败: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+    
+    // 第四步：获取当前用户信息
+    let username = std::env::var("USERNAME").map_err(|e| format!("获取用户名失败: {}", e))?;
+    let userdomain = std::env::var("USERDOMAIN").unwrap_or_else(|_| "".to_string());
+    let full_user = if userdomain.is_empty() {
+        username
+    } else {
+        format!("{}\\{}", userdomain, username)
+    };
+    
+    eprintln!("[mmshell] 当前用户: {}", full_user);
+    
+    // 第五步：授予当前用户完全控制权限
+    let grant_arg = format!("{}:(F)", full_user);
+    let output = Command::new("icacls")
+        .arg(key_path)
+        .arg("/grant:r")
+        .arg(&grant_arg)
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|e| format!("设置权限失败: {}", e))?;
+    
+    if !output.status.success() {
+        return Err(format!("icacls /grant:r失败: {}\n命令: icacls {} /grant:r {}", 
+            String::from_utf8_lossy(&output.stderr), key_path, grant_arg));
+    }
+    
+    eprintln!("[mmshell] 私钥权限已成功修复: {}", key_path);
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn fix_ssh_key_permissions(_key_path: &str) -> Result<(), String> {
+    // Unix系统使用chmod
+    let output = Command::new("chmod")
+        .arg("600")
+        .arg(_key_path)
+        .output()
+        .map_err(|e| format!("修复权限失败: {}", e))?;
+    
+    if !output.status.success() {
+        return Err(format!("chmod失败: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+    Ok(())
+}
 use windows::{
     core::Interface,
     Win32::{
@@ -111,6 +199,9 @@ struct ConnectPayload {
     /// 由前端传入；SSH/SFTP 在 PTY 中交互输入密码，此处仅反序列化以保持 API 一致。
     #[allow(dead_code)]
     password: String,
+    /// 私钥文件路径（可选）
+    #[serde(default)]
+    private_key_path: Option<String>,
 }
 
 #[derive(Debug)]
@@ -277,6 +368,27 @@ fn connect_ssh(app: AppHandle, payload: ConnectPayload) -> Result<String, String
     cmd.arg("HostKeyAlgorithms=+ssh-rsa");
     cmd.arg("-o");
     cmd.arg("PubkeyAcceptedAlgorithms=+ssh-rsa");
+    
+    // 如果提供了私钥路径，则使用私钥认证
+    if let Some(ref key_path) = payload.private_key_path {
+        if !key_path.is_empty() {
+            // 自动修复私钥权限
+            match fix_ssh_key_permissions(key_path) {
+                Ok(_) => eprintln!("[mmshell] SSH: 私钥权限修复成功"),
+                Err(e) => {
+                    eprintln!("[mmshell] SSH: 私钥权限修复失败: {}", e);
+                    eprintln!("[mmshell] SSH: 将继续尝试连接，但可能会失败");
+                }
+            }
+            
+            cmd.arg("-i");
+            cmd.arg(key_path);
+            // 使用私钥时，禁用密码认证
+            cmd.arg("-o");
+            cmd.arg("PasswordAuthentication=no");
+        }
+    }
+    
     cmd.arg("-p");
     cmd.arg(parsed.port.to_string());
     cmd.arg(format!("{}@{}", parsed.user, parsed.host));
@@ -434,6 +546,27 @@ fn connect_sftp(app: AppHandle, payload: ConnectPayload) -> Result<String, Strin
     cmd.arg("HostKeyAlgorithms=+ssh-rsa");
     cmd.arg("-o");
     cmd.arg("PubkeyAcceptedAlgorithms=+ssh-rsa");
+    
+    // 如果提供了私钥路径，则使用私钥认证
+    if let Some(ref key_path) = payload.private_key_path {
+        if !key_path.is_empty() {
+            // 自动修复私钥权限
+            match fix_ssh_key_permissions(key_path) {
+                Ok(_) => eprintln!("[mmshell] SFTP: 私钥权限修复成功"),
+                Err(e) => {
+                    eprintln!("[mmshell] SFTP: 私钥权限修复失败: {}", e);
+                    eprintln!("[mmshell] SFTP: 将继续尝试连接，但可能会失败");
+                }
+            }
+            
+            cmd.arg("-i");
+            cmd.arg(key_path);
+            // 使用私钥时，禁用密码认证
+            cmd.arg("-o");
+            cmd.arg("PasswordAuthentication=no");
+        }
+    }
+    
     cmd.arg("-P");
     cmd.arg(parsed.port.to_string());
     cmd.arg(format!("{}@{}", parsed.user, parsed.host));
